@@ -209,6 +209,10 @@ object SlickBuild extends Build {
         ProblemFilters.exclude[MissingClassProblem]("slick.util.MacroSupportInterpolationImpl")
       ),
       ivyConfigurations += config("macro").hide.extend(Compile),
+      libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ % "macro"),
+      libraryDependencies ++= Seq(
+        "org.mongodb" % "casbah_2.10" % "2.6.1" % "optional" 
+      ),
       unmanagedClasspath in Compile <++= fullClasspath in config("macro"),
       mappings in (Compile, packageSrc) <++= mappings in (config("macro"), packageSrc),
       mappings in (Compile, packageBin) <++= mappings in (config("macro"), packageBin),
@@ -303,32 +307,6 @@ object SlickBuild extends Build {
     )
   ) dependsOn(slickProject)
 
-  lazy val slickDirectProject = Project(id = "direct", base = file("slick-direct"),
-    settings = Defaults.coreDefaultSettings ++ sdlcSettings ++ sharedSettings ++ extTarget("direct") ++ Seq(
-      name := "Slick-Direct",
-      description := "Direct Embedding for Slick (Scala Language-Integrated Connection Kit)",
-      libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _),
-      scalacOptions in (Compile, doc) <++= version.map(v => Seq(
-        "-doc-source-url", "https://github.com/slick/slick/blob/"+v+"/slick-direct/src/main€{FILE_PATH}.scala"
-      )),
-      test := (), testOnly :=  (), // suppress test status output
-      sdlcBase := "direct-api/",
-      sdlcCheckDir := (target in (slickProject, com.typesafe.sbt.SbtSite.SiteKeys.makeSite)).value,
-      sdlc <<= sdlc dependsOn (doc in Compile, com.typesafe.sbt.SbtSite.SiteKeys.makeSite in slickProject)
-    )
-  ) dependsOn(slickProject)
-
-  lazy val reactiveStreamsTestProject = Project(id = "reactive-streams-tests", base = file("reactive-streams-tests"),
-    settings = Defaults.coreDefaultSettings ++ sharedSettings ++ testNGSettings ++ Seq(
-      name := "Slick-ReactiveStreamsTests",
-      unmanagedResourceDirectories in Test += (baseDirectory in aRootProject).value / "common-test-resources",
-      libraryDependencies ++=
-        (Dependencies.logback +: Dependencies.testDBs).map(_ % "test") ++:
-        Dependencies.reactiveStreamsTCK +:
-        Dependencies.testngExtras,
-      testNGSuites := Seq("reactive-streams-tests/src/test/resources/testng.xml")
-    )
-  ) dependsOn(slickTestkitProject)
 
   lazy val osgiBundleFiles = taskKey[Seq[File]]("osgi-bundles that our tests rely on using.")
 
