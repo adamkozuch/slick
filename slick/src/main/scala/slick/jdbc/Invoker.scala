@@ -1,4 +1,4 @@
-package slick.jdbc
+package scala.slick.jdbc
 
 import scala.language.higherKinds
 import scala.annotation.unchecked.{uncheckedVariance => uV}
