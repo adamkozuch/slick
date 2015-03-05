@@ -1,12 +1,14 @@
 package scala.slick.common
 
+
 import scala.language.higherKinds
 import scala.annotation.unchecked.{uncheckedVariance => uV}
 import scala.collection.immutable.Map
 import scala.collection.generic.CanBuildFrom
-import scala.slick.util.CloseableIterator
-import scala.slick.util.iter._
+import slick.util.CloseableIterator
+import slick.util.iter._
 import scala.slick.backend.DatabaseComponent
+
 
 /** Base trait for all statement invokers of result element type R. */
 trait GenericInvoker[+R] { self =>

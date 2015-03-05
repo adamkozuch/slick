@@ -13,9 +13,9 @@ import de.johoop.testngplugin.TestNGPlugin._
 
 object SlickBuild extends Build {
 
-  val slickVersion = "3.0.0-RC3"
+  val slickVersion = "3.0.0-SNAPSHOT"
   val binaryCompatSlickVersion = "3.0.0" // Slick base version for binary compatibility checks
-  val scalaVersions = Seq("2.10.5", "2.11.6")
+  val scalaVersions = Seq("2.10.4", "2.11.4")
 
   /** Dependencies for reuse in different parts of the build */
   object Dependencies {
@@ -29,7 +29,7 @@ object SlickBuild extends Build {
     val slf4j = "org.slf4j" % "slf4j-api" % "1.6.4"
     val logback = "ch.qos.logback" % "logback-classic" % "0.9.28"
     val typesafeConfig = "com.typesafe" % "config" % "1.2.1"
-    val reactiveStreamsVersion = "1.0.0.RC4"
+    val reactiveStreamsVersion = "1.0.0.RC3"
     val reactiveStreams = "org.reactivestreams" % "reactive-streams" % reactiveStreamsVersion
     val reactiveStreamsTCK = "org.reactivestreams" % "reactive-streams-tck" % reactiveStreamsVersion
     val pools = Seq(
@@ -207,12 +207,12 @@ object SlickBuild extends Build {
       binaryIssueFilters ++= Seq(
         ProblemFilters.exclude[MissingClassProblem]("slick.util.MacroSupportInterpolationImpl$"),
         ProblemFilters.exclude[MissingClassProblem]("slick.util.MacroSupportInterpolationImpl")
-      ), libraryDependencies ++= Seq(
-        //TODO: check if Salat or other libraries are required
-        "org.mongodb" %% "casbah" % "2.8.0",
-        "com.novus" %% "salat" % "1.9.8"
       ),
       ivyConfigurations += config("macro").hide.extend(Compile),
+      libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _ % "macro"),
+      libraryDependencies ++= Seq(
+        "org.mongodb" % "casbah_2.10" % "2.6.1" % "optional" 
+      ),
       unmanagedClasspath in Compile <++= fullClasspath in config("macro"),
       mappings in (Compile, packageSrc) <++= mappings in (config("macro"), packageSrc),
       mappings in (Compile, packageBin) <++= mappings in (config("macro"), packageBin),
@@ -249,6 +249,8 @@ object SlickBuild extends Build {
       testOptions += Tests.Argument(TestFrameworks.JUnit, "-q", "-v", "-s", "-a", "-Djava.awt.headless=true"),
       //scalacOptions in Compile += "-Yreify-copypaste",
       libraryDependencies ++=
+        ("postgresql" % "postgresql" % "9.1-901.jdbc4" % "test") +:
+        ("mysql" % "mysql-connector-java" % "5.1.23" % "test") +:
         Dependencies.junit ++:
         (Dependencies.reactiveStreamsTCK % "test") +:
         (Dependencies.logback +: Dependencies.testDBs).map(_ % "test") ++:
@@ -305,32 +307,6 @@ object SlickBuild extends Build {
     )
   ) dependsOn(slickProject)
 
-  lazy val slickDirectProject = Project(id = "direct", base = file("slick-direct"),
-    settings = Defaults.coreDefaultSettings ++ sdlcSettings ++ sharedSettings ++ extTarget("direct") ++ Seq(
-      name := "Slick-Direct",
-      description := "Direct Embedding for Slick (Scala Language-Integrated Connection Kit)",
-      libraryDependencies <+= scalaVersion("org.scala-lang" % "scala-compiler" % _),
-      scalacOptions in (Compile, doc) <++= version.map(v => Seq(
-        "-doc-source-url", "https://github.com/slick/slick/blob/"+v+"/slick-direct/src/main€{FILE_PATH}.scala"
-      )),
-      test := (), testOnly :=  (), // suppress test status output
-      sdlcBase := "direct-api/",
-      sdlcCheckDir := (target in (slickProject, com.typesafe.sbt.SbtSite.SiteKeys.makeSite)).value,
-      sdlc <<= sdlc dependsOn (doc in Compile, com.typesafe.sbt.SbtSite.SiteKeys.makeSite in slickProject)
-    )
-  ) dependsOn(slickProject)
-
-  lazy val reactiveStreamsTestProject = Project(id = "reactive-streams-tests", base = file("reactive-streams-tests"),
-    settings = Defaults.coreDefaultSettings ++ sharedSettings ++ testNGSettings ++ Seq(
-      name := "Slick-ReactiveStreamsTests",
-      unmanagedResourceDirectories in Test += (baseDirectory in aRootProject).value / "common-test-resources",
-      libraryDependencies ++=
-        (Dependencies.logback +: Dependencies.testDBs).map(_ % "test") ++:
-        Dependencies.reactiveStreamsTCK +:
-        Dependencies.testngExtras,
-      testNGSuites := Seq("reactive-streams-tests/src/test/resources/testng.xml")
-    )
-  ) dependsOn(slickTestkitProject)
 
   lazy val osgiBundleFiles = taskKey[Seq[File]]("osgi-bundles that our tests rely on using.")
 
@@ -350,7 +326,7 @@ object SlickBuild extends Build {
       testGrouping <<= definedTests in Test map partitionTests,
       osgiBundleFiles := Seq((OsgiKeys.bundle in slickProject).value),
       osgiBundleFiles ++= (dependencyClasspath in Compile in slickProject).value.map(_.data).filterNot(_.isDirectory),
-      osgiBundleFiles ++= (dependencyClasspath in Test).value.map(_.data).filter(f => f.name.contains("logback-") || f.name.contains("h2") || f.name.contains("reactive-streams")),
+      osgiBundleFiles ++= (dependencyClasspath in Test).value.map(_.data).filter(f => f.name.contains("logback-") || f.name.contains("h2")),
       publishArtifact := false
     )
     dependsOn(slickProject % "test")
@@ -368,11 +344,9 @@ object SlickBuild extends Build {
     )
   }
 
-  lazy val buildCapabilitiesTable = taskKey[Unit]("Build the capabilities.csv table for the documentation")
-
   /* FMPP Task */
   lazy val fmpp = TaskKey[Seq[File]]("fmpp")
-  lazy val fmppConfig = config("fmpp").hide
+  lazy val fmppConfig = config("fmpp") hide
   lazy val fmppSettings = inConfig(Compile)(Seq(sourceGenerators <+= fmpp, fmpp <<= fmppTask)) ++ Seq(
     libraryDependencies ++= Seq(
       ("net.sourceforge.fmpp" % "fmpp" % "0.9.14" % fmppConfig.name).intransitive,
@@ -389,16 +363,16 @@ object SlickBuild extends Build {
       (sourceManaged in Compile, managedSources in Compile, sourceDirectory in Compile) map { (base, srcs, srcDir) =>
         val fmppSrc = srcDir / "scala"
         val inFiles = fmppSrc ** "*.fm"
-        (srcs pair (Path.relativeTo(base) | Path.flat)) ++ // Add generated sources to sources JAR
-          (inFiles pair (Path.relativeTo(fmppSrc) | Path.flat)) // Add *.fm files to sources JAR
+        (srcs x (Path.relativeTo(base) | Path.flat)) ++ // Add generated sources to sources JAR
+          (inFiles x (Path.relativeTo(fmppSrc) | Path.flat)) // Add *.fm files to sources JAR
       }
   )
   lazy val fmppTask =
     (fullClasspath in fmppConfig, runner in fmpp, sourceManaged, streams, sourceDirectory) map { (cp, r, output, s, srcDir) =>
       val fmppSrc = srcDir / "scala"
-      val inFiles = (fmppSrc ** "*.fm").get.toSet
+      val inFiles = (fmppSrc ** "*.fm" get).toSet
       val cachedFun = FileFunction.cached(s.cacheDirectory / "fmpp", outStyle = FilesInfo.exists) { (in: Set[File]) =>
-        IO.delete((output ** "*.scala").get)
+        IO.delete(output ** "*.scala" get)
         val args = "--expert" :: "-q" :: "-S" :: fmppSrc.getPath :: "-O" :: output.getPath ::
           "--replace-extensions=fm, scala" :: "-M" :: "execute(**/*.fm), ignore(**/*)" :: Nil
         toError(r.run("fmpp.tools.CommandLine", cp.files, args, s.log))
@@ -408,7 +382,7 @@ object SlickBuild extends Build {
     }
 
   /** Slick type provider code gen  */
-  lazy val typeProviders = taskKey[Seq[File]]("Type provider code generation")
+  lazy val typeProviders = TaskKey[Seq[File]]("Type provider code generation")
   lazy val typeProvidersConfig = config("codegen").hide
   lazy val typeProvidersSettings = {
     inConfig(typeProvidersConfig)(Defaults.configSettings) ++
@@ -419,8 +393,7 @@ object SlickBuild extends Build {
 
       (compile in Test) <<= (compile in Test) dependsOn (compile in typeProvidersConfig),
 
-      unmanagedClasspath in typeProvidersConfig <++= fullClasspath in config("compile"),
-      unmanagedClasspath in typeProvidersConfig <++= fullClasspath in (slickCodegenProject, Test),
+      unmanagedClasspath in typeProvidersConfig <++= fullClasspath in (slickProject, Test),
       unmanagedClasspath in Test <++= fullClasspath in typeProvidersConfig,
       //mappings in (Test, packageSrc) <++= mappings in (typeProvidersConfig, packageSrc),
       //mappings in (Test, packageBin) <++= mappings in (typeProvidersConfig, packageBin),
@@ -429,8 +402,8 @@ object SlickBuild extends Build {
         (sourceManaged in Test, managedSources in Test, sourceDirectory in Test) map { (base, srcs, srcDir) =>
           val src = srcDir / "codegen"
           val inFiles = src ** "*.scala"
-          (srcs pair (Path.relativeTo(base) | Path.flat)) ++ // Add generated sources to sources JAR
-            (inFiles pair (Path.relativeTo(src) | Path.flat)) // Add *.fm files to sources JAR
+          (srcs x (Path.relativeTo(base) | Path.flat)) ++ // Add generated sources to sources JAR
+            (inFiles x (Path.relativeTo(src) | Path.flat)) // Add *.fm files to sources JAR
         }
     )
   }
@@ -438,14 +411,12 @@ object SlickBuild extends Build {
     (fullClasspath in typeProvidersConfig, runner in typeProviders, sourceManaged in Test, streams, sourceDirectory, sourceDirectory in slickProject) map { (cp, r, output, s, srcDir, slickSrc) =>
       val src = srcDir / "codegen"
       val outDir = (output/"slick-codegen").getPath 
-      val inFiles = (src ** "*.scala").get.toSet ++ (slickSrc / "main/scala/slick/codegen" ** "*.scala").get.toSet ++ (slickSrc / "main/scala/slick/jdbc/meta" ** "*.scala").get.toSet
+      val inFiles = (src ** "*.scala" get).toSet ++ (slickSrc / "main/scala/scala/slick/model/codegen" ** "*.scala" get).toSet ++ (slickSrc / "main/scala/scala/slick/jdbc/meta" ** "*.scala" get).toSet
       val cachedFun = FileFunction.cached(s.cacheDirectory / "type-providers", outStyle = FilesInfo.exists) { (in: Set[File]) =>
-        IO.delete((output ** "*.scala").get)
-        toError(r.run("slick.test.codegen.GenerateMainSources", cp.files, Array(outDir), s.log))
-        toError(r.run("slick.test.codegen.GenerateRoundtripSources", cp.files, Array(outDir), s.log))
+        IO.delete(output ** "*.scala" get)
+        toError(r.run("scala.slick.test.model.codegen.CodeGeneratorTest", cp.files, Array(outDir, "scala.slick.test.model.codegen.generated"), s.log))
         (output ** "*.scala").get.toSet
       }
       cachedFun(inFiles).toSeq
     }
 }
-
