@@ -2,7 +2,6 @@ package scala
 
 //import scala.language.higherKinds
 
-
 package object slick {
   @deprecated("Package 'scala.slick' has been renamed to 'slick'", "3.0")
   type SlickException = _root_.slick.SlickException

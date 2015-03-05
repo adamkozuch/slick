@@ -1,8 +1,8 @@
-package scala.slick.mongodb.lifted
+package slick.mongodb.lifted
 
 import scala.reflect.ClassTag
-import scala.slick.ast.{Ordering, BaseTypedType, ScalaType}
-import scala.slick.profile.RelationalTypesComponent
+import slick.ast.{Ordering, BaseTypedType, ScalaType}
+import slick.profile.RelationalTypesComponent
 
 
 trait MongoTypesComponent extends RelationalTypesComponent{driver: MongoDriver =>

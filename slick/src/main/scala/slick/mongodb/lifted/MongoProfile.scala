@@ -1,20 +1,48 @@
-package scala.slick.mongodb.lifted
+package slick.mongodb.lifted
+
+import slick.backend.RelationalBackend
+import slick.dbio.Effect.Schema
+import slick.dbio.{SynchronousDatabaseAction, Effect, NoStream}
+import slick.memory.DistributedBackend
+import slick.util.DumpInfo
 
 import scala.language.{higherKinds, implicitConversions}
-import scala.slick.ast._
-import scala.slick.compiler.QueryCompiler
-import scala.slick.lifted.Query
-import scala.slick.mongodb.direct.MongoBackend
-import scala.slick.profile.{RelationalDriver, RelationalProfile}
+import slick.ast._
+import slick.compiler.QueryCompiler
+import slick.lifted.Query
+import slick.mongodb.direct.MongoBackend
+import slick.profile.{FixedBasicAction, RelationalDriver, RelationalProfile}
 
 // TODO: split into traits?
 trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent with MongoTypesComponent{ driver: MongoDriver =>
 
-  override type Backend = MongoBackend
-  override val backend: Backend = MongoBackend
+   type Backend = MongoBackend
+   val backend = MongoBackend
 
-  override val Implicit: Implicits = new Implicits {}
-  override val simple: SimpleQL = new SimpleQL {}
+  protected trait CommonImplicits extends super.CommonImplicits with ImplicitColumnTypes
+//  trait Implicits extends super.Implicits with CommonImplicits
+//  trait SimpleQL extends super.SimpleQL with Implicits
+  trait API extends super.API with CommonImplicits
+
+  override val Implicit: Implicits = simple
+  override val simple: SimpleQL  = new SimpleQL {}
+  override val api = new API{}
+
+
+  type QueryActionExtensionMethods[R, S <: NoStream] = QueryActionExtensionMethodsImpl[R, S]
+  type StreamingQueryActionExtensionMethods[R, T] = StreamingQueryActionExtensionMethodsImpl[R, T]
+  type SchemaActionExtensionMethods = SchemaActionExtensionMethodsImpl
+  type InsertActionExtensionMethods[T] = InsertActionExtensionMethodsImpl[T]
+
+  def createQueryActionExtensionMethods[R, S <: NoStream](tree: Node, param: Any): QueryActionExtensionMethods[R, S] =
+    ???
+  def createStreamingQueryActionExtensionMethods[R, T](tree: Node, param: Any): StreamingQueryActionExtensionMethods[R, T] =
+    ???
+  def createSchemaActionExtensionMethods(schema: SchemaDescription): SchemaActionExtensionMethods =
+    ???
+  def createInsertActionExtensionMethods[T](compiled: CompiledInsert): InsertActionExtensionMethods[T] =
+    ???
+
 
 
   // TODO: extend for complicated node structure, probably mongodb nodes should be used
@@ -60,10 +88,10 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
   override def buildTableSchemaDescription(table: Table[_]): SchemaDescription = ???
 
   override type QueryExecutor[T] = QueryExecutorDef[T]
-  override type UnshapedQueryExecutor[T] = UnshapedQueryExecutorDef[T]
+  //override type UnshapedQueryExecutor[T] = UnshapedQueryExecutorDef[T]
   /** Create an executor -- this method should be implemented by drivers as needed */
   override def createQueryExecutor[R](tree: Node, param: Any): QueryExecutor[R] = ???
-  override def createUnshapedQueryExecutor[M](value: M): UnshapedQueryExecutor[M] = ???
+  //override def createUnshapedQueryExecutor[M](value: M): UnshapedQueryExecutor[M] = ???
 }
 
 // TODO: make it a class?

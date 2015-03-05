@@ -1,9 +1,9 @@
-package scala.slick.mongodb.direct
+package slick.mongodb.direct
 
 import com.mongodb.DBObject
 import com.mongodb.util.JSON
 
-import scala.slick.mongodb.MongoInvoker
+import slick.mongodb.MongoInvoker
 
 class SimpleMongoInvoker[T](override val mongoCollection: TypedMongoCollection[T],override val query: Option[DBObject]) extends MongoInvoker[T]
 object SimpleMongoInvoker{
@@ -13,7 +13,7 @@ object SimpleMongoInvoker{
     new SimpleMongoInvoker[R](typedMongoCollection,parsedQuery(queryString,queryParameters))
   }
 
-  import scala.slick.mongodb.direct.MongoInterpolation._
+  import slick.mongodb.direct.MongoInterpolation._
   private def interpolatedQuery[P](queryString:Option[String], queryParameters: Option[P]): Option[String] = queryParameters match{
     case Some(parameters) => queryString.map(interpolate[P](_,parameters))
     case None => queryString

@@ -1,10 +1,10 @@
-package scala.slick.mongodb.direct
+package slick.mongodb.direct
 
 import com.mongodb.DBObject
 import com.mongodb.casbah.commons.MongoDBObject
 
 import scala.language.implicitConversions
-import scala.slick.mongodb.direct.MongoInterpolation._
+import slick.mongodb.direct.MongoInterpolation._
 
 
 // TODO: finish documentation here

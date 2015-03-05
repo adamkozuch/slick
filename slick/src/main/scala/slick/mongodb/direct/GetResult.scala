@@ -1,4 +1,4 @@
-package scala.slick.mongodb.direct
+package slick.mongodb.direct
 
 import com.mongodb.casbah.commons.MongoDBObject
 

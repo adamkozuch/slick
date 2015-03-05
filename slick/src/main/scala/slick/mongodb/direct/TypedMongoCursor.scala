@@ -1,9 +1,9 @@
-package scala.slick.mongodb.direct
+package slick.mongodb.direct
 
 import com.mongodb.casbah.Imports._
 import com.mongodb.casbah.{CursorExplanation, MongoCursor}
 
-import scala.slick.util.CloseableIterator
+import slick.util.CloseableIterator
 
 /**
  * Wraps Casbah's MongoCursor, so that values returned from TypedMongoCursor

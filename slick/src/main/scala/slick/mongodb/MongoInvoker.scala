@@ -1,9 +1,12 @@
-package scala.slick.mongodb
+package slick.mongodb
 
 import com.mongodb.DBObject
 
+import slick.mongodb.direct.{TypedMongoCursor, MongoBackend, TypedMongoCollection}
+
+
+
 import scala.slick.common.GenericInvoker
-import scala.slick.mongodb.direct.{TypedMongoCursor, MongoBackend, TypedMongoCollection}
 
 
 trait MongoInvoker[T] extends GenericInvoker[T] {

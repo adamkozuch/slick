@@ -1,11 +1,11 @@
-package scala.slick.mongodb.lifted
+package slick.mongodb.lifted
 
 import com.mongodb.DBObject
 import com.mongodb.casbah.commons.Imports._
 
-import scala.slick.ast._
-import scala.slick.mongodb.MongoInvoker
-import scala.slick.mongodb.direct.{GetResult, MongoBackend, TypedMongoCollection}
+import slick.ast._
+import slick.mongodb.MongoInvoker
+import slick.mongodb.direct.{GetResult, MongoBackend, TypedMongoCollection}
 
 
 trait GenericLiftedMongoInvoker[T] {
@@ -101,7 +101,7 @@ object GenericLiftedMongoInvoker{
 
 // TODO: use MongoNode
 class LiftedMongoInvoker[T](val queryNode: Node, val session: MongoBackend#Session) extends MongoInvoker[T] with GenericLiftedMongoInvoker[T]{
-  import scala.slick.mongodb.lifted.LiftedMongoInvoker._
+  import slick.mongodb.lifted.LiftedMongoInvoker._
   println(s"Query invoker created with node:\t$queryNode")
 
 

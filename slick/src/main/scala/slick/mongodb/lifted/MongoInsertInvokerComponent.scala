@@ -1,12 +1,12 @@
-package scala.slick.mongodb.lifted
+package slick.mongodb.lifted
 
 
 import com.mongodb.casbah.Imports._
 
 import scala.annotation.implicitNotFound
 import scala.language.implicitConversions
-import scala.slick.ast._
-import scala.slick.profile.BasicInsertInvokerComponent
+import slick.ast._
+import slick.profile.BasicInsertInvokerComponent
 
 trait MongoInsertInvokerComponent extends BasicInsertInvokerComponent{ driver: MongoDriver =>
   override type InsertInvoker[T] = InsertInvokerDef[T]
