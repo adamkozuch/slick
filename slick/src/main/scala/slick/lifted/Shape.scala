@@ -47,7 +47,8 @@ abstract class Shape[Level <: ShapeLevel, -Mixed_, Unpacked_, Packed_] {
 }
 
 object Shape extends ConstColumnShapeImplicits with AbstractTableShapeImplicits with TupleShapeImplicits {
-  implicit final def primitiveShape[T, Level <: ShapeLevel](implicit tm: TypedType[T]): Shape[Level, T, T, ConstColumn[T]] = new Shape[Level, T, T, ConstColumn[T]] {
+  implicit final def primitiveShape[T, Level <: ShapeLevel](implicit tm: TypedType[T]): Shape[Level, T, T, ConstColumn[T]] =
+    new Shape[Level, T, T, ConstColumn[T]] {
     def pack(value: Mixed) = LiteralColumn(value)
     def packedShape = RepShape[Level, Packed, Unpacked]
     def buildParams(extract: Any => Unpacked): Packed = new ConstColumn[T](new QueryParameter(extract, tm))(tm)
@@ -67,7 +68,7 @@ object Shape extends ConstColumnShapeImplicits with AbstractTableShapeImplicits 
     def toNode(value: Mixed) = ProductNode(Nil)
   }
 }
-
+ //FORME  powyzej typ prosty i unit. Jego ksztalt moze trzeba zdefiniowac nowy. jaki jest ksztalt kolekcji?
 trait AbstractTableShapeImplicits extends RepShapeImplicits {
   @inline implicit final def tableShape[Level >: FlatShapeLevel <: ShapeLevel, T, C <: AbstractTable[_]](implicit ev: C <:< AbstractTable[T]) = RepShape[Level, C, T]
 }
@@ -281,7 +282,7 @@ final class ToShapedValue[T](val value: T) extends AnyVal {
   @inline def shaped[U](implicit shape: Shape[_ <: FlatShapeLevel, T, U, _]) = new ShapedValue[T, U](value, shape)
   @inline def <>[R : ClassTag, U](f: (U => R), g: (R => Option[U]))(implicit shape: Shape[_ <: FlatShapeLevel, T, U, _]) = new MappedProjection[R, U](shape.toNode(value), MappedScalaType.Mapper(g.andThen(_.get).asInstanceOf[Any => Any], f.asInstanceOf[Any => Any], None), implicitly[ClassTag[R]])
 }
-
+//FORME tutaj o projekcji z tabeli na wymagany ksztalt
 /** A limited version of ShapedValue which can be constructed for every type
   * that has a valid shape. We use it to enforce that a table's * projection
   * has a valid shape. A ProvenShape has itself a Shape so it can be used in

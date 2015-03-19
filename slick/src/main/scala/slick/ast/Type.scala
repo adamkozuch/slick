@@ -271,12 +271,12 @@ trait NumericTypedType
 object TypedType {
   @inline implicit def typedTypeToOptionTypedType[T](implicit t: TypedType[T]): OptionTypedType[T] = t.optionType
 }
-
+//FORME tutaj w typach jest kolekcja może z tym by się coś udało zrobić
 class TypeUtil(val tpe: Type) extends AnyVal {
   def asCollectionType: CollectionType = tpe match {
     case c: CollectionType => c
     case _ => throw new SlickException("Expected a collection type, found "+tpe)
-  }
+  }//FORME co to znaczy ze typ opcjonalny
   def asOptionType: OptionType = tpe match {
     case o: OptionType => o
     case _ => throw new SlickException("Expected an option type, found "+tpe)

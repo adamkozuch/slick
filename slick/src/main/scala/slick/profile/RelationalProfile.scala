@@ -163,7 +163,7 @@ object RelationalProfile {
 trait RelationalDriver extends BasicDriver with RelationalProfile {
   override val profile: RelationalProfile = this
 }
-
+//FORME definicja tabeli i kolumny relacyjnej
 trait RelationalTableComponent { driver: RelationalDriver =>
 
   def buildTableSchemaDescription(table: Table[_]): SchemaDescription
@@ -177,7 +177,8 @@ trait RelationalTableComponent { driver: RelationalDriver =>
 
   val columnOptions: ColumnOptions = new ColumnOptions {}
 
-  abstract class Table[T](_tableTag: Tag, _schemaName: Option[String], _tableName: String) extends AbstractTable[T](_tableTag, _schemaName, _tableName) { table =>
+  abstract class Table[T](_tableTag: Tag, _schemaName: Option[String], _tableName: String)
+    extends AbstractTable[T](_tableTag, _schemaName, _tableName) { table =>
     final type TableElementType = T
 
     def this(_tableTag: Tag, _tableName: String) = this(_tableTag, None, _tableName)
