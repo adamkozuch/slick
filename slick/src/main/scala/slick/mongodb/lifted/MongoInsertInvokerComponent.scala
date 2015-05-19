@@ -19,11 +19,12 @@ trait MongoInsertInvokerComponent extends BasicInsertInvokerComponent{ driver: M
   @implicitNotFound("Implicit converter of type ${T}=>DBObject required for MongoDB InsertInvoker")
   final class InsertInvokerDef[T](val node: CompiledInsert) extends super.InsertInvokerDef[T] with GenericLiftedMongoInvoker[T] {
     println(s"Query invoker created with node:\t$node")
+
     override def queryNode = node
 
     /** Used to convert specified type to DBObject */
     val binder: Product => MongoDBObject = { p: Product =>
-      val pairs: List[(String,Any)] = (attributeNames.iterator zip p.productIterator).toList
+      val pairs: List[(String, Any)] = (attributeNames.iterator zip p.productIterator).toList
       MongoDBObject(pairs)
     }
 
@@ -34,6 +35,7 @@ trait MongoInsertInvokerComponent extends BasicInsertInvokerComponent{ driver: M
     /** Insert a single value */
     override def +=(value: T)(implicit session: Backend#Session): SingleInsertResult =
       collection(session).insert(binder(value.asInstanceOf[Product]))
+
     /** Insert a collection of values */
     override def ++=(values: Iterable[T])(implicit session: Backend#Session): MultiInsertResult = {
       val builder = collection(session).initializeOrderedBulkOperation

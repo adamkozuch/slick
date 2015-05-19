@@ -40,10 +40,9 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
     ???
   def createSchemaActionExtensionMethods(schema: SchemaDescription): SchemaActionExtensionMethods =
     ???
-  def createInsertActionExtensionMethods[T](compiled: CompiledInsert): InsertActionExtensionMethods[T] =
-    ???
 
 
+ 
 
   // TODO: extend for complicated node structure, probably mongodb nodes should be used
   /** (Partially) compile an AST for insert operations */
@@ -92,6 +91,13 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
   /** Create an executor -- this method should be implemented by drivers as needed */
   override def createQueryExecutor[R](tree: Node, param: Any): QueryExecutor[R] = ???
   //override def createUnshapedQueryExecutor[M](value: M): UnshapedQueryExecutor[M] = ???
+
+
+
+  def createInsertActionExtensionMethods[T](compiled: MongoDriver.CompiledInsert) = ???
+
+  type DriverAction = this.type
+  type StreamingDriverAction = this.type
 }
 
 // TODO: make it a class?
@@ -99,5 +105,3 @@ trait MongoDriver extends MongoProfile with RelationalDriver {
   override val profile: MongoProfile = this
 }
 object MongoDriver extends MongoDriver
-
-
