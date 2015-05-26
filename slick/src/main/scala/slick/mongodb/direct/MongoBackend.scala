@@ -7,29 +7,43 @@ import org.reactivestreams.Subscriber
 import org.slf4j.LoggerFactory
 
 import slick.backend.{RelationalBackend, DatabaseComponent}
-import slick.util.SlickLogger
+import slick.util.{AsyncExecutor, SlickLogger}
 
 trait MongoBackend extends RelationalBackend{
   protected[this] lazy val statementLogger = new SlickLogger(LoggerFactory.getLogger(classOf[MongoBackend].getName+".statement"))
 
+  type This = MongoBackend
   type Database = DatabaseDef
   type Session = SessionDef
   type DatabaseFactory = DatabaseFactoryDef
+  type StreamingContext = BasicStreamingActionContext  // TODO
+  type Context = BasicActionContext //TODO
 
   val Database = new DatabaseFactoryDef {}
   val backend: MongoBackend = this
+
+  /** Create a Database instance through [[https://github.com/typesafehub/config Typesafe Config]].
+    * The supported config keys are backend-specific. This method is used by `DatabaseConfig`.
+    * @param path The path in the configuration file for the database configuration, or an empty
+    *             string for the top level of the `Config` object.
+    * @param config The `Config` object to read from.
+    */
+  def createDatabase(config: Config, path: String) = ??? //TODO
+
 
   // TODO: add possibility to create DatabaseDef without url
   // In case user wants to create the connection with separate
   // parameters: username, password, etc. we don't really need to concatenate
   // them into URI and then pass it to MongoClientURI for parsing
-  class DatabaseDef(val connectionUrl:String) extends super.DatabaseDef{
+  class DatabaseDef(val connectionUrl:String, val executor: AsyncExecutor) extends super.DatabaseDef{
 
     override def createSession(): Session = {
       val mongoUri = MongoClientURI(connectionUrl)
       val mongoClient = MongoClient(mongoUri)
+
       //TODO: check if there's better way without using Option.get:
       val mongoDb = mongoClient(mongoUri.database.get)
+
       new Session(mongoDb)
     }
 
@@ -44,22 +58,22 @@ trait MongoBackend extends RelationalBackend{
       * simply implement this method and get `shutdown` as an asynchronous wrapper for free. If
       * the underlying shutdown procedure is asynchronous, you should implement `shutdown` instead
       * and wrap it with `Await.result` in this method. */
-    def close = ???
+    def close = ???  //TODO
 
     /** Return the default ExecutionContet for this Database which should be used for running
       * SynchronousDatabaseActions for asynchronous execution. */
-    protected[this] def synchronousExecutionContext = ???
+    protected[this] def synchronousExecutionContext = executor.executionContext //TODO
 
     /** Create the default StreamingDatabaseActionContext for this backend. */
-    protected[this] def createStreamingDatabaseActionContext[T](s: Subscriber[_ >: T], useSameThread: Boolean) = ???
+    protected[this] def createStreamingDatabaseActionContext[T](s: Subscriber[_ >: T], useSameThread: Boolean) = new BasicStreamingActionContext(s, useSameThread, DatabaseDef.this)//TODO
 
     /** Create the default DatabaseActionContext for this backend. */
-    protected[this] def createDatabaseActionContext[T](_useSameThread: Boolean) = ???
+    protected[this] def createDatabaseActionContext[T](_useSameThread: Boolean) = new BasicActionContext { val useSameThread = _useSameThread } // base on HeapBackend
   }
 
   trait DatabaseFactoryDef extends super.DatabaseFactoryDef{
     //TODO: add other methods and parameters here
-    def forURL(url: String):DatabaseDef = new DatabaseDef(url)
+    def forURL(url: String, executor: AsyncExecutor = AsyncExecutor.default()):DatabaseDef = new DatabaseDef(url, executor )
   }
 
   /**
@@ -105,16 +119,9 @@ trait MongoBackend extends RelationalBackend{
 
 }
 
-object MongoBackend extends MongoBackend {type This = DatabaseComponent
+object MongoBackend extends MongoBackend
 
-  /** Create a Database instance through [[https://github.com/typesafehub/config Typesafe Config]].
-    * The supported config keys are backend-specific. This method is used by `DatabaseConfig`.
-    * @param path The path in the configuration file for the database configuration, or an empty
-    *             string for the top level of the `Config` object.
-    * @param config The `Config` object to read from.
-    */
-  def createDatabase(config: Config, path: String) = ???
 
-  type StreamingContext = BasicStreamingActionContext
-  type Context = BasicActionContext
-}
+
+
+

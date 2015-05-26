@@ -1,48 +1,52 @@
 package slick.mongodb.lifted
 
+import com.mongodb.casbah.commons.MongoDBObject
+import slick.SlickException
+import slick.ast.TypeUtil.:@
 import slick.backend.RelationalBackend
 import slick.dbio.Effect.Schema
-import slick.dbio.{SynchronousDatabaseAction, Effect, NoStream}
+import slick.dbio.{Streaming, SynchronousDatabaseAction, Effect, NoStream}
+import slick.jdbc.StreamingInvokerAction
 import slick.memory.DistributedBackend
-import slick.util.DumpInfo
+import slick.relational.CompiledMapping
+import slick.util.{SQLBuilder, DumpInfo}
+
 
 import scala.language.{higherKinds, implicitConversions}
 import slick.ast._
 import slick.compiler.QueryCompiler
 import slick.lifted.Query
-import slick.mongodb.direct.MongoBackend
-import slick.profile.{FixedBasicAction, RelationalDriver, RelationalProfile}
+import slick.mongodb.direct.{MongoQuery, MongoBackend}
+import slick.profile.{FixedBasicStreamingAction, FixedBasicAction, RelationalDriver, RelationalProfile}
 
 // TODO: split into traits?
 trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent with MongoTypesComponent{ driver: MongoDriver =>
 
    type Backend = MongoBackend
    val backend = MongoBackend
-
-  protected trait CommonImplicits extends super.CommonImplicits with ImplicitColumnTypes
-//  trait Implicits extends super.Implicits with CommonImplicits
-//  trait SimpleQL extends super.SimpleQL with Implicits
-  trait API extends super.API with CommonImplicits
-
   override val Implicit: Implicits = simple
   override val simple: SimpleQL  = new SimpleQL {}
   override val api = new API{}
 
 
-  type QueryActionExtensionMethods[R, S <: NoStream] = QueryActionExtensionMethodsImpl[R, S]
-  type StreamingQueryActionExtensionMethods[R, T] = StreamingQueryActionExtensionMethodsImpl[R, T]
+
+  protected trait CommonImplicits extends super.CommonImplicits with ImplicitColumnTypes
+//  trait Implicits extends super.Implicits with CommonImplicits
+//  trait SimpleQL extends super.SimpleQL with Implicits
+  trait API extends super.API with CommonImplicits// todo maybe I should use methods from simple in api
+{
+  implicit def queryToLiftedMongoInvoker[T,C[_]](q: Query[_,T,C])(implicit session: MongoBackend#Session): LiftedMongoInvoker[T] =
+    new LiftedMongoInvoker[T](queryCompiler.run(q.toNode).tree,session)
+}
+  trait SimpleQL extends super.SimpleQL with Implicits
+
+
+
+
   type SchemaActionExtensionMethods = SchemaActionExtensionMethodsImpl
-  type InsertActionExtensionMethods[T] = InsertActionExtensionMethodsImpl[T]
+  type DriverAction[+R, +S <: NoStream, -E <: Effect] = FixedBasicAction[R, S, E] //todo not sure if it is right atcion
+  type StreamingDriverAction[+R, +T, -E <: Effect] = FixedBasicStreamingAction[R, T, E]
 
-  def createQueryActionExtensionMethods[R, S <: NoStream](tree: Node, param: Any): QueryActionExtensionMethods[R, S] =
-    ???
-  def createStreamingQueryActionExtensionMethods[R, T](tree: Node, param: Any): StreamingQueryActionExtensionMethods[R, T] =
-    ???
-  def createSchemaActionExtensionMethods(schema: SchemaDescription): SchemaActionExtensionMethods =
-    ???
-
-
- 
 
   // TODO: extend for complicated node structure, probably mongodb nodes should be used
   /** (Partially) compile an AST for insert operations */
@@ -76,7 +80,62 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
       new LiftedMongoInvoker[T](queryCompiler.run(q.toNode).tree,session)
   }
 
-  trait SimpleQL extends super.SimpleQL with Implicits
+  ///////////////////////////////////////////StreamingQueryActionExtension///////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////
+  type StreamingQueryActionExtensionMethods[R, T] = StreamingQueryActionExtensionMethodsImpl[R, T]
+
+  def createStreamingQueryActionExtensionMethods[R, T](tree: Node, param: Any): StreamingQueryActionExtensionMethods[R, T] =
+    new StreamingQueryActionExtensionMethodsImpl[R,T](tree,param)
+
+  class StreamingQueryActionExtensionMethodsImpl[R, T](tree: Node, param: Any) extends QueryActionExtensionMethodsImpl[R, Streaming[T]](tree, param) with super.StreamingQueryActionExtensionMethodsImpl[R, T] {
+    override def result: StreamingDriverAction[R, T, Effect.Read] = super.result.asInstanceOf[StreamingDriverAction[R, T, Effect.Read]]
+  }
+
+
+///////////////////////////////////////////QueryActionExtension///////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////////
+type QueryActionExtensionMethods[R, S <: NoStream] = QueryActionExtensionMethodsImpl[R, S]
+
+  def createQueryActionExtensionMethods[R, S <: NoStream](tree: Node, param: Any): QueryActionExtensionMethods[R, S] =
+    new QueryActionExtensionMethodsImpl[R,S](tree,param)
+
+
+  class QueryActionExtensionMethodsImpl[R, S <: NoStream](tree: Node, param: Any) extends super.QueryActionExtensionMethodsImpl[R, S] {
+    /** An Action that runs this query. */
+    def result = ???
+  }
+
+  ////////////////////////////////////////////InsertActionExtension///////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////////////////////
+
+  type InsertActionExtensionMethods[T] = InsertActionExtensionMethodsImpl[T]
+
+  def createInsertActionExtensionMethods[T](compiled: MongoDriver.CompiledInsert) = new InsertActionExtensionMethodsImpl[T](compiled)
+
+  class InsertActionExtensionMethodsImpl[T](compiled: CompiledInsert) extends super.InsertActionExtensionMethodsImpl[T] {
+    protected[this] def wrapAction[E <: Effect, T](name: String, f: Backend#Session => Any): DriverAction[T, NoStream, E] =
+      new SynchronousDatabaseAction[T, NoStream, Backend, E] with DriverAction[T, NoStream, E] {
+        def run(ctx: Backend#Context) = f(ctx.session).asInstanceOf[T]
+        override def getDumpInfo = ??? //super.getDumpInfo.copy(name = name)
+        def overrideStatements(_statements: Iterable[String]) =
+          throw new SlickException("overrideStatements is not supported for insert operations")
+      }
+
+    val inv = createInsertInvoker[T](compiled)
+    type SingleInsertResult = Unit
+    type MultiInsertResult = Unit
+    def += (value: T) = wrapAction("+=",inv.+=(value)(_))
+    def ++= (values: Iterable[T]) = wrapAction("+=",inv.++=(values)(_))
+  }
+
+
+/////////////////////////////////////////////////QueryExecutor//////////////////////////////////////////
+  /** Create an executor -- this method should be implemented by drivers as needed */
+  override type QueryExecutor[T] =  QueryExecutorDef[T]
+  override def createQueryExecutor[R](tree: Node, param: Any): QueryExecutor[R] = ???
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+
 
   // TODO: not required for MongoDB:
   /** Create a DDLInvoker -- this method should be implemented by drivers as needed */
@@ -85,23 +144,20 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
   override type SchemaDescription = SchemaDescriptionDef
   override def buildSequenceSchemaDescription(seq: Sequence[_]): SchemaDescription = ???
   override def buildTableSchemaDescription(table: Table[_]): SchemaDescription = ???
+  def createSchemaActionExtensionMethods(schema: SchemaDescription): SchemaActionExtensionMethods =
+    ???
+  class SchemaActionExtensionMethodsImpl(schema: SchemaDescription) extends super.SchemaActionExtensionMethodsImpl {
+    def create = ???
+    def drop = ???
+  }
 
-  override type QueryExecutor[T] = QueryExecutorDef[T]
-  //override type UnshapedQueryExecutor[T] = UnshapedQueryExecutorDef[T]
-  /** Create an executor -- this method should be implemented by drivers as needed */
-  override def createQueryExecutor[R](tree: Node, param: Any): QueryExecutor[R] = ???
-  //override def createUnshapedQueryExecutor[M](value: M): UnshapedQueryExecutor[M] = ???
+  //todo methods will be removed
+//  override type UnshapedQueryExecutor[T] = UnshapedQueryExecutorDef[T]
+//  override def createUnshapedQueryExecutor[M](value: M): UnshapedQueryExecutor[M] = ???
 
-
-
-  def createInsertActionExtensionMethods[T](compiled: MongoDriver.CompiledInsert) = ???
-
-  type DriverAction = this.type
-  type StreamingDriverAction = this.type
 }
 
 // TODO: make it a class?
-trait MongoDriver extends MongoProfile with RelationalDriver {
-  override val profile: MongoProfile = this
-}
+trait MongoDriver extends MongoProfile with RelationalDriver
+
 object MongoDriver extends MongoDriver
