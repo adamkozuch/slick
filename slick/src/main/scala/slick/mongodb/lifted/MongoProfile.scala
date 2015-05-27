@@ -16,7 +16,7 @@ import scala.language.{higherKinds, implicitConversions}
 import slick.ast._
 import slick.compiler.QueryCompiler
 import slick.lifted.Query
-import slick.mongodb.direct.{MongoQuery, MongoBackend}
+import slick.mongodb.direct.{GetResult, MongoQuery, MongoBackend}
 import slick.profile.{FixedBasicStreamingAction, FixedBasicAction, RelationalDriver, RelationalProfile}
 
 // TODO: split into traits?
@@ -34,10 +34,7 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
 //  trait Implicits extends super.Implicits with CommonImplicits
 //  trait SimpleQL extends super.SimpleQL with Implicits
   trait API extends super.API with CommonImplicits// todo maybe I should use methods from simple in api
-{
-  implicit def queryToLiftedMongoInvoker[T,C[_]](q: Query[_,T,C])(implicit session: MongoBackend#Session): LiftedMongoInvoker[T] =
-    new LiftedMongoInvoker[T](queryCompiler.run(q.toNode).tree,session)
-}
+
   trait SimpleQL extends super.SimpleQL with Implicits
 
 
@@ -45,7 +42,7 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
 
   type SchemaActionExtensionMethods = SchemaActionExtensionMethodsImpl
   type DriverAction[+R, +S <: NoStream, -E <: Effect] = FixedBasicAction[R, S, E] //todo not sure if it is right atcion
-  type StreamingDriverAction[+R, +T, -E <: Effect] = FixedBasicStreamingAction[R, T, E]
+ // type StreamingDriverAction[+R, +T, -E <: Effect] = FixedBasicStreamingAction[R, T, E]
 
 
   // TODO: extend for complicated node structure, probably mongodb nodes should be used
@@ -85,7 +82,7 @@ trait MongoProfile extends RelationalProfile with MongoInsertInvokerComponent wi
   type StreamingQueryActionExtensionMethods[R, T] = StreamingQueryActionExtensionMethodsImpl[R, T]
 
   def createStreamingQueryActionExtensionMethods[R, T](tree: Node, param: Any): StreamingQueryActionExtensionMethods[R, T] =
-    new StreamingQueryActionExtensionMethodsImpl[R,T](tree,param)
+  new StreamingQueryActionExtensionMethodsImpl[R,T](tree,param)
 
   class StreamingQueryActionExtensionMethodsImpl[R, T](tree: Node, param: Any) extends QueryActionExtensionMethodsImpl[R, Streaming[T]](tree, param) with super.StreamingQueryActionExtensionMethodsImpl[R, T] {
     override def result: StreamingDriverAction[R, T, Effect.Read] = super.result.asInstanceOf[StreamingDriverAction[R, T, Effect.Read]]
@@ -101,8 +98,14 @@ type QueryActionExtensionMethods[R, S <: NoStream] = QueryActionExtensionMethods
 
 
   class QueryActionExtensionMethodsImpl[R, S <: NoStream](tree: Node, param: Any) extends super.QueryActionExtensionMethodsImpl[R, S] {
-    /** An Action that runs this query. */
-    def result = ???
+    def result: DriverAction[R, S, Effect.Read] =
+      new DriverAction[R, S, Effect.Read] with SynchronousDatabaseAction[R, S, Backend#This, Effect.Read] {
+        def run(ctx: Backend#Context) = {
+          val inv = new LiftedMongoInvoker[R](tree,ctx.session)
+                   inv.firstOption(ctx.session).asInstanceOf[R] // just to provide some implementation will be removed
+        }
+        def getDumpInfo = DumpInfo("MongoProfile.DriverAction")
+      }
   }
 
   ////////////////////////////////////////////InsertActionExtension///////////////////////////////
@@ -113,7 +116,7 @@ type QueryActionExtensionMethods[R, S <: NoStream] = QueryActionExtensionMethods
   def createInsertActionExtensionMethods[T](compiled: MongoDriver.CompiledInsert) = new InsertActionExtensionMethodsImpl[T](compiled)
 
   class InsertActionExtensionMethodsImpl[T](compiled: CompiledInsert) extends super.InsertActionExtensionMethodsImpl[T] {
-    protected[this] def wrapAction[E <: Effect, T](name: String, f: Backend#Session => Any): DriverAction[T, NoStream, E] =
+     def wrapAction[E <: Effect, T](name: String, f: Backend#Session => Any): DriverAction[T, NoStream, E] =
       new SynchronousDatabaseAction[T, NoStream, Backend, E] with DriverAction[T, NoStream, E] {
         def run(ctx: Backend#Context) = f(ctx.session).asInstanceOf[T]
         override def getDumpInfo = ??? //super.getDumpInfo.copy(name = name)
